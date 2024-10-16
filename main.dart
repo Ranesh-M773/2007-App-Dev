@@ -96,6 +96,7 @@ class TraceScreen extends StatefulWidget {
 
 class _TraceScreenState extends State<TraceScreen> {
   late SignatureController _controller;
+  bool isErasing = false;  // Eraser mode
 
   // List of chalk colors to choose from
   final List<Color> chalkColors = [
@@ -115,7 +116,7 @@ class _TraceScreenState extends State<TraceScreen> {
   void initState() {
     super.initState();
     _controller = SignatureController(
-      penStrokeWidth: 5,
+      penStrokeWidth: 8,
       penColor: selectedChalkColor,
     );
   }
@@ -124,9 +125,21 @@ class _TraceScreenState extends State<TraceScreen> {
   void _updateChalkColor(Color newColor) {
     setState(() {
       selectedChalkColor = newColor;
+      isErasing = false;  // Turn off eraser when changing color
       _controller = SignatureController(
-        penStrokeWidth: 5,
+        penStrokeWidth: 8,
         penColor: selectedChalkColor,
+      );
+    });
+  }
+
+  // Function to toggle eraser mode
+  void _toggleEraser() {
+    setState(() {
+      isErasing = !isErasing;
+      _controller = SignatureController(
+        penStrokeWidth: isErasing ? 8:8,  // Make eraser thicker
+        penColor: isErasing ? Colors.transparent : selectedChalkColor,  // Eraser is transparent
       );
     });
   }
@@ -158,11 +171,22 @@ class _TraceScreenState extends State<TraceScreen> {
                   ),
                   ClipPath(
                     clipper: NumberClipper(widget.number), // Custom clipper for the number
-                    child: Signature(
-                      controller: _controller,
-                      backgroundColor: Colors.transparent,
-                      height: 300,
-                      width: 300,
+                    child: ShaderMask(
+                      shaderCallback: (Rect bounds) {
+                        return RadialGradient(
+                          center: Alignment.topLeft,
+                          radius: 1.0,
+                          colors: <Color>[selectedChalkColor.withOpacity(0.6), selectedChalkColor],
+                          tileMode: TileMode.mirror,
+                        ).createShader(bounds);
+                      },
+                      blendMode: BlendMode.srcATop,
+                      child: Signature(
+                        controller: _controller,
+                        backgroundColor: Colors.transparent,
+                        height: 300,
+                        width: 300,
+                      ),
                     ),
                   ),
                 ],
@@ -198,6 +222,14 @@ class _TraceScreenState extends State<TraceScreen> {
                   ),
                 );
               },
+            ),
+          ),
+          // Eraser toggle button
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ElevatedButton(
+              onPressed: _toggleEraser,
+              child: Text(isErasing ? 'Switch to Drawing' : 'Switch to Eraser'),
             ),
           ),
           Padding(
@@ -240,7 +272,14 @@ class NumberClipper extends CustomClipper<Path> {
 
     double centerX = size.width / 2;
     double centerY = size.height / 2;
-    double radius = 75.0; // Defines how wide the tracing area should be around the number.
+    
+    // Adjust the radius based on the number range
+    double radius;
+    if (number >= 0 && number <= 9) {
+      radius = 75.0;  // For numbers 0-9
+    } else {
+      radius = 90.0;  // For numbers 10-19
+    }
 
     path.addOval(Rect.fromCircle(center: Offset(centerX, centerY), radius: radius));
 
@@ -252,3 +291,5 @@ class NumberClipper extends CustomClipper<Path> {
     return false; // Return true if the clipper should update when the widget rebuilds
   }
 }
+
+
